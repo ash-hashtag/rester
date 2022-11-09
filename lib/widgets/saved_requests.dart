@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -96,6 +97,13 @@ class RequestingPanel extends StatefulWidget {
 }
 
 class _RequestingPanelState extends State<RequestingPanel> {
+  final jsonTc = TextEditingController();
+  final urlTc = TextEditingController();
+
+  final uploadProgressKey = GlobalKey<_ProgressIndicatorState>();
+  final downloadProgressKey = GlobalKey<_ProgressIndicatorState>();
+
+  final Map<String, String> headers = {};
   @override
   void initState() {
     Changes.onChange(onChange);
@@ -105,6 +113,8 @@ class _RequestingPanelState extends State<RequestingPanel> {
   @override
   void dispose() {
     Changes.removeCallback(onChange);
+    jsonTc.dispose();
+    urlTc.dispose();
     super.dispose();
   }
 
@@ -129,9 +139,9 @@ class _RequestingPanelState extends State<RequestingPanel> {
           padding: const EdgeInsets.all(8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              MethodDropDown(),
-              Expanded(
+            children: [
+              const MethodDropDown(),
+              const Expanded(
                 child: TextField(
                   style: TextStyle(fontSize: 20),
                   decoration: InputDecoration(
@@ -139,6 +149,7 @@ class _RequestingPanelState extends State<RequestingPanel> {
                   ),
                 ),
               ),
+              IconButton(icon: const Icon(Icons.send), onPressed: sendRequest)
             ],
           ),
         ),
@@ -163,7 +174,8 @@ class _RequestingPanelState extends State<RequestingPanel> {
                     itemCount: files.length,
                     itemBuilder: (context, index) => FileWidget(
                       file: files[index],
-                      onDelete: () =>
+                      icon: const Icon(Icons.delete),
+                      onIconPressed: () =>
                           setState(() => files.remove(files[index])),
                     ),
                   )
@@ -208,6 +220,44 @@ class _RequestingPanelState extends State<RequestingPanel> {
         });
       }
     });
+  }
+
+  void sendRequest() async {
+    final url = urlTc.text;
+
+    final dio = Dio();
+    if (method == RequestMethod.post || method == RequestMethod.put) {
+      if (bodyType == BodyType.json) {
+        if (method == RequestMethod.post) {
+          final Response<Stream<int>> response = await dio.post(
+            url,
+            data: jsonTc.text,
+            options: Options(
+              responseType: ResponseType.stream,
+            ),
+            onSendProgress: uploadProgressKey.currentState!.progress,
+            onReceiveProgress: downloadProgressKey.currentState!.progress,
+          );
+
+          final responseWidget = ResponsePanel(
+              statusCode: response.statusCode!,
+              headers: response.headers.map
+                  .map((key, value) => MapEntry(key, value.join(','))),
+              body: await () async {
+                final contentLength = response.headers.value("content-length");
+                if (contentLength != null &&
+                    int.tryParse(contentLength) != null) {
+                  final size = int.parse(contentLength);
+                  if (size > 1000000) {
+                    return const ProgressIndicator();
+                  }
+                }
+                return SelectableText(
+                    String.fromCharCodes(await response.data!.toList()));
+              }());
+        }
+      }
+    }
   }
 }
 
@@ -311,7 +361,6 @@ class _MethodDropDownState extends State<MethodDropDown> {
 
 class Changes {
   static var method = RequestMethod.get;
-  static var type = ProtocalType.rest;
   static var url = "";
 
   static final callbacks = <VoidCallback>[];
@@ -372,8 +421,10 @@ class _ProtocalPickerState extends State<ProtocalPicker> {
 
 class FileWidget extends StatelessWidget {
   final PlatformFile file;
-  final VoidCallback? onDelete;
-  const FileWidget({super.key, required this.file, this.onDelete});
+  final VoidCallback? onIconPressed;
+  final Icon? icon;
+  const FileWidget(
+      {super.key, required this.file, this.onIconPressed, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -381,10 +432,12 @@ class FileWidget extends StatelessWidget {
       title: Text(file.name),
       subtitle: Text(formattedString(file.size, 'B')),
       leading: getLeading(),
-      trailing: IconButton(
-        icon: const Icon(Icons.delete),
-        onPressed: onDelete,
-      ),
+      trailing: icon == null
+          ? null
+          : IconButton(
+              icon: icon!,
+              onPressed: onIconPressed,
+            ),
     );
   }
 
@@ -405,5 +458,88 @@ class FileWidget extends StatelessWidget {
       );
     }
     return null;
+  }
+}
+
+class SwitchWidget extends StatefulWidget {
+  final bool value;
+  const SwitchWidget({super.key, this.value = false});
+
+  @override
+  State<SwitchWidget> createState() => _SwitchWidgetState();
+}
+
+class _SwitchWidgetState extends State<SwitchWidget> {
+  late var value = widget.value;
+  @override
+  Widget build(BuildContext context) {
+    return Switch.adaptive(
+        value: value, onChanged: (_) => setState(() => value = _));
+  }
+}
+
+class ResponsePanel extends StatelessWidget {
+  final int statusCode;
+  final Map<String, String> headers;
+  final Widget body;
+  const ResponsePanel(
+      {super.key,
+      required this.statusCode,
+      required this.headers,
+      required this.body});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SelectableText("Status: $statusCode"),
+        Container(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5),
+          child: ListView(children: [
+            for (var entry in headers.entries)
+              SelectableText("${entry.key}: ${entry.value}"),
+          ]),
+        ),
+        Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.3,
+            maxWidth: MediaQuery.of(context).size.width * 0.5,
+          ),
+          child: body,
+        )
+      ],
+    );
+  }
+}
+
+class ProgressIndicator extends StatefulWidget {
+  final bool showText;
+  final VoidCallback? onDone;
+  const ProgressIndicator({super.key, this.showText = false, this.onDone});
+
+  @override
+  State<ProgressIndicator> createState() => _ProgressIndicatorState();
+}
+
+class _ProgressIndicatorState extends State<ProgressIndicator> {
+  void progress(int count, int total) {
+    setState(() => value = count / total);
+    if (value == 1.0 && widget.onDone != null) widget.onDone!();
+  }
+
+  var value = 0.0;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        LinearProgressIndicator(
+          value: value,
+          valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+        ),
+        if (widget.showText) Text("${value * 100}%")
+      ],
+    );
   }
 }
