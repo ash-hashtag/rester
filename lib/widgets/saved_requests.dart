@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -29,6 +29,8 @@ class ResizableWindow extends StatefulWidget {
 }
 
 class _ResizableWindowState extends State<ResizableWindow> {
+  late final _httpClient = http.Client();
+
   late var _width = widget.width;
 
   var _grabbedGood = false;
@@ -224,40 +226,39 @@ class _RequestingPanelState extends State<RequestingPanel> {
 
   void sendRequest() async {
     final url = urlTc.text;
+    final client = http.Client();
+    // if (method == RequestMethod.post || method == RequestMethod.put) {
+    // if (bodyType == BodyType.json) {
+    //   if (method == RequestMethod.post) {
+    //     final response = await client.post(
+    //       url,
+    //       data: jsonTc.text,
+    //       options: Options(
+    //         responseType: ResponseType.stream,
+    //       ),
+    //       onSendProgress: uploadProgressKey.currentState!.progress,
+    //       onReceiveProgress: downloadProgressKey.currentState!.progress,
+    //     );
 
-    final dio = Dio();
-    if (method == RequestMethod.post || method == RequestMethod.put) {
-      if (bodyType == BodyType.json) {
-        if (method == RequestMethod.post) {
-          final Response<Stream<int>> response = await dio.post(
-            url,
-            data: jsonTc.text,
-            options: Options(
-              responseType: ResponseType.stream,
-            ),
-            onSendProgress: uploadProgressKey.currentState!.progress,
-            onReceiveProgress: downloadProgressKey.currentState!.progress,
-          );
-
-          final responseWidget = ResponsePanel(
-              statusCode: response.statusCode!,
-              headers: response.headers.map
-                  .map((key, value) => MapEntry(key, value.join(','))),
-              body: await () async {
-                final contentLength = response.headers.value("content-length");
-                if (contentLength != null &&
-                    int.tryParse(contentLength) != null) {
-                  final size = int.parse(contentLength);
-                  if (size > 1000000) {
-                    return const ProgressIndicator();
-                  }
-                }
-                return SelectableText(
-                    String.fromCharCodes(await response.data!.toList()));
-              }());
-        }
-      }
-    }
+    //     final responseWidget = ResponsePanel(
+    //         statusCode: response.statusCode!,
+    //         headers: response.headers.map
+    //             .map((key, value) => MapEntry(key, value.join(','))),
+    //         body: await () async {
+    //           final contentLength = response.headers.value("content-length");
+    //           if (contentLength != null &&
+    //               int.tryParse(contentLength) != null) {
+    //             final size = int.parse(contentLength);
+    //             if (size > 1000000) {
+    //               return const ProgressIndicator();
+    //             }
+    //           }
+    //           return SelectableText(
+    //               String.fromCharCodes(await response.data!.toList()));
+    //         }());
+    //   }
+    // }
+    // }
   }
 }
 

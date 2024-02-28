@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rester/homepage.dart';
+// import 'package:rester/homepage.dart';
+import 'mobile/homepage.dart';
 import 'package:rester/themes.dart';
 
 void main() {

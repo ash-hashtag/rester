@@ -8,8 +8,8 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Rester")),
-      body: Row(
-        children: const [
+      body: const Row(
+        children: [
           RequestsExplorer(),
           // RequestingPanel(),
           Expanded(child: ProtocalPicker())
