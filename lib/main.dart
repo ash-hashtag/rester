@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 // import 'package:rester/homepage.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'mobile/homepage.dart';
 import 'package:rester/themes.dart';
 
-void main() {
+void main() async {
+  await Hive.initFlutter("hive");
+
   runApp(const MyApp());
 
   // doWhenWindowReady(() {

@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_highlighting/flutter_highlighting.dart' as hl;
+import 'package:flutter_highlighting/themes/github.dart';
 import 'package:http/http.dart' as http;
 
 class ResponseWidget extends StatefulWidget {
@@ -16,16 +18,22 @@ class _ResponseWidgetState extends State<ResponseWidget> {
 
   Widget _outputWidget = const SizedBox();
 
+  var _isReadAll = false; // is already read all response
+
   @override
   void initState() {
     super.initState();
 
     _listenToStream();
+
+    if (_isReadAll) {
+      _onDone();
+    }
   }
 
   void _listenToStream() async {
     try {
-      await for (var bytes in response.stream) {
+      await for (final bytes in response.stream) {
         _onBytes(bytes);
       }
     } catch (err) {
@@ -38,14 +46,28 @@ class _ResponseWidgetState extends State<ResponseWidget> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _statusWidget(),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: _statusWidget(),
+        ),
         Expanded(
           child: ListView(
             children: [
-              HeadersWidget(
-                headers: response.headers,
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: HeadersWidget(
+                  headers: response.headers,
+                ),
               ),
-              _outputWidget,
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                    padding: const EdgeInsets.all(8.0),
+                    decoration: BoxDecoration(
+                        border: Border.all(),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: _outputWidget),
+              ),
             ],
           ),
         ),
@@ -55,6 +77,7 @@ class _ResponseWidgetState extends State<ResponseWidget> {
 
   final _receivedBytes = <int>[];
   late final _contentLength = _getContentLength();
+  late final _contentType = _getContentType();
 
   int? _getContentLength() {
     final contentLengthHeaderValue = response.headers["content-length"];
@@ -96,10 +119,18 @@ class _ResponseWidgetState extends State<ResponseWidget> {
     try {
       final totalBytes = _receivedBytes;
       final body = utf8.decode(totalBytes);
-      setState(() => _outputWidget = Text(body));
+      setState(() {
+        _outputWidget = Text(body);
+        _isReadAll = true;
+      });
     } catch (err, st) {
       debugPrint("Error $err $st");
     }
+  }
+
+  String _getContentType() {
+    final value = response.headers["content-type"];
+    return value ?? "";
   }
 }
 
@@ -114,6 +145,8 @@ class HeadersWidget extends StatelessWidget {
 
   TableRow _widgetBuilder(String headerName, String headerValue) {
     return TableRow(
+      // decoration: BoxDecoration(
+      //     borderRadius: BorderRadius.circular(10), border: Border.all()),
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
@@ -133,7 +166,7 @@ class HeadersWidget extends StatelessWidget {
         headers.entries.map((e) => _widgetBuilder(e.key, e.value)).toList();
     return Table(
       children: children,
-      border: TableBorder.all(),
+      border: TableBorder.all(borderRadius: BorderRadius.circular(10)),
     );
   }
 }
